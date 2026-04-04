@@ -309,7 +309,6 @@ class ImageStreamProcessor(BaseProcessor):
 
                 # Image generation progress
                 if img := resp.get("streamingImageGenerationResponse"):
-                    logger.debug(f"ImageStream progress: imageIndex={img.get('imageIndex')}, progress={img.get('progress')}, keys={list(img.keys())}")
                     image_index = img.get("imageIndex", 0)
                     progress = img.get("progress", 0)
 
@@ -334,9 +333,7 @@ class ImageStreamProcessor(BaseProcessor):
 
                 # modelResponse
                 if mr := resp.get("modelResponse"):
-                    logger.debug(f"ImageStream modelResponse: generatedImageUrls={mr.get('generatedImageUrls')}, imageUrls={mr.get('imageUrls')}, message={str(mr.get('message',''))[:200]}")
                     if urls := _collect_images(mr):
-                        logger.debug(f"ImageStream collected {len(urls)} image URLs")
                         for url in urls:
                             if self.response_format == "url":
                                 processed = await self.process_url(url, "image")
@@ -363,7 +360,6 @@ class ImageStreamProcessor(BaseProcessor):
                                     final_images.append(processed)
                     continue
 
-            logger.debug(f"ImageStream finished: final_images count = {len(final_images)}")
             for index, img_data in enumerate(final_images):
                 if self.n == 1:
                     if index != self.target_index:
