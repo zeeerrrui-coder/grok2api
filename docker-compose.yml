@@ -10,17 +10,8 @@ services:
       SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
       SERVER_PORT: ${SERVER_PORT:-8000}
       SERVER_WORKERS: ${SERVER_WORKERS:-1}
-      SERVER_STORAGE_TYPE: pgsql
-      SERVER_STORAGE_URL: postgresql+asyncpg://grok2api:grok2api_pass@postgres:5432/grok2api
-      FLARESOLVERR_URL: http://flaresolverr:8191
-      CF_REFRESH_INTERVAL: "600"
-      CF_TIMEOUT: "60"
-    command:
-      - sh
-      - -c
-      - >
-        granian --interface asgi --host "$${SERVER_HOST:-0.0.0.0}"
-        --port "$${SERVER_PORT:-8000}" --workers "$${SERVER_WORKERS:-1}" main:app
+      ACCOUNT_STORAGE: postgresql
+      ACCOUNT_POSTGRESQL_URL: postgresql+asyncpg://grok2api:grok2api_pass@postgres:5432/grok2api
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
