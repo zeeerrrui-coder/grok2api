@@ -9,7 +9,7 @@ from app.platform.config.snapshot import get_config
 from app.platform.logging.logger import logger
 from app.platform.runtime.clock import now_ms
 from app.platform.runtime.batch import run_batch
-from app.control.model.enums import ALL_MODES_WITH_HEAVY
+from app.control.model.enums import ALL_MODES_FULL
 from .enums import AccountStatus, QuotaSource
 from .models import AccountRecord, QuotaWindow
 from .quota_defaults import (
@@ -49,6 +49,7 @@ _MODE_KEYS = {
     1: "quota_fast",
     2: "quota_expert",
     3: "quota_heavy",
+    4: "quota_grok_4_3",
 }
 
 
@@ -56,9 +57,9 @@ class AccountRefreshService:
     """Fetches real quota data from the upstream usage API and persists it.
 
     Triggers:
-      1. Import   — super accounts: fetch all 3 modes.
-      2. Call     — super accounts: fetch the called mode (async, non-blocking).
-      3. Schedule — super: fetch all 3 modes; basic: static window reset check.
+      1. Import   — fetch all modes supported by the account's pool.
+      2. Call     — fetch the called mode only (async, non-blocking).
+      3. Schedule — refresh one pool per loop using that pool's supported modes.
     """
 
     def __init__(self, repository: "AccountRepository") -> None:
@@ -74,7 +75,13 @@ class AccountRefreshService:
     async def _fetch_all_quotas(
         self, token: str, pool: str
     ) -> dict[int, QuotaWindow] | None:
-        """Fetch quota windows for modes supported by *pool*. Returns {mode_id: window}."""
+        """Fetch quota windows for every mode supported by *pool*.
+
+        Examples:
+          - basic -> auto / fast / expert
+          - super -> auto / fast / expert / grok_4_3
+          - heavy -> auto / fast / expert / heavy / grok_4_3
+        """
         try:
             from app.dataplane.reverse.protocol.xai_usage import fetch_all_quotas
 
@@ -141,7 +148,7 @@ class AccountRefreshService:
         return agg
 
     async def refresh_call_async(self, token: str, mode_id: int) -> None:
-        """Fire-and-forget quota sync after a successful call (all accounts)."""
+        """Fire-and-forget single-mode quota sync after a successful call."""
         record = (await self._repo.get_accounts([token]) or [None])[0]
         if record is None or record.is_deleted():
             return
@@ -218,7 +225,7 @@ class AccountRefreshService:
         *,
         apply_fallback: bool = False,
     ) -> RefreshResult:
-        """Fetch all 3 modes from the usage API and persist real quota data.
+        """Fetch all pool-supported modes from the usage API and persist them.
 
         apply_fallback=True  — used by scheduled/import paths: when API fails,
                                decrement REAL quotas or reset expired DEFAULT windows.
@@ -248,7 +255,7 @@ class AccountRefreshService:
         patches: dict[str, dict] = {}
         refreshed = False
 
-        for mode in ALL_MODES_WITH_HEAVY:
+        for mode in ALL_MODES_FULL:
             mode_id = int(mode)
             if mode_id in windows:
                 patches[_MODE_KEYS[mode_id]] = windows[mode_id].to_dict()
@@ -320,7 +327,7 @@ class AccountRefreshService:
         now = now_ms()
         patches: dict[str, dict] = {}
 
-        for mode in ALL_MODES_WITH_HEAVY:
+        for mode in ALL_MODES_FULL:
             mode_id = int(mode)
             existing = qs.get(mode_id)
             if existing is None:
